@@ -57,5 +57,53 @@ class GraphAttentionLayer(Module):
         
         # Dropout layer
         self.dropout = nn.Dropout(dropout)
-        
     
+    def forward(self, h: torch.Tensor, adj_mat: torch.Tensor):
+        '''
+        h: Input으로 들어오는 node embedding의 shape (i.e. [n_nodes, in_features])
+        adj_mat: adjacency matrix의 shape (i.e. [n_nodes, n_nodes, n_heads])
+        '''
+        n_nodes = h.shape[0]
+        g = self.linear(h).view(n_nodes, self.n_heads, self.n_hidden)
+        
+        # Calculate attention score
+        '''
+        e_ij: attention score from node j to node i
+        a: attention mechanism
+        
+        e_ij = LeakyReLU(a^T[g_i||g_j])
+        '''
+        g_repeat = g.repeat(n_nodes, 1, 1) # {g_1, g_2, ... , g_n_nodes, g_1, g_2, ...}
+        g_repeat_interleave = g.repeat_interleave(n_nodes, dim=0) # {g_1, g_1, ... , g_2, g_2, ... , g_n_nodes, ...}
+        
+        g_concat = torch.cat([g_repeat_interleave, g_repeat], dim=-1) 
+        g_concat = g_concat.view(n_nodes, n_nodes, self.n_heads, 2 * self.n_hidden) # g_concat[i,j] = g_i||g_j
+        
+        # e_ij = LeakyReLU(a^T[g_i||g_j])
+        e = self.activation(self.attn(g_concat)) # e.shape = [n_nodes, n_nodes, n_heads, 1]
+        e = e.squeeze(-1) # remove last dimension
+        
+        # check adjacency matrix: [n_nodes, n_nodes, n_heads] or [n_nodes, n_nodes, 1]
+        assert adj_mat.shape[0] == 1 or adj_mat.shape[0] == n_nodes
+        assert adj_mat.shape[1] == 1 or adj_mat.shape[1] == n_nodes
+        assert adj_mat.shape[2] == 1 or adj_mat.shape[2] == self.n_heads
+        
+        # Mask e_ij based on adjacency matrix 
+        e = e.masked_fill(adj_mat == 0, float('-inf')) # if there is no edges btw i and j, e_ij = -inf
+        
+        # Normalize attention scores
+        # \alpha_ij = softmax_j(e_ij)
+        a = self.softmax(e)
+        a = self.dropout(a) # apply dropout regularization
+        
+        # Calculate final output for each head
+        # ommited unlinearity \theta to appy it on GAT model later
+        attn_res = torch.einsum('ijh,jhf->ihf', a, g)
+        
+        # Concatenate the head
+        if self.is_concat:
+            return attn_res.reshape(n_nodes, self.n_head * self.n_hidden)
+        
+        # Or mean
+        else:
+            return attn_res.mean(dim=1)
