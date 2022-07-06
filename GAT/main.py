@@ -30,10 +30,44 @@ class CoraDataset:
     adj_mat: torch.Tensor
     
     # Download the Dataset
-    @staticmethod
-    def _download():
+    @classmethod
+    def _download(cls):
         if not (lab.get_data_path() / 'cora').exists():
             download.download_file('https://linqs-data.soe.ucsc.edu/public/lbc/cora.tgz',
                                    lab.get_data_path() / 'cora.tgz')
             download.extract_tar(lab.get_data_path() / 'cora.tgz', lab.get_data_path())
     
+    def __init__(self, include_edges, bool = True):
+        self.include_edges = include_edges
+        self._download()
+        
+        with monit.section('Read Content'):
+            content = np.genfromtxt(str(lab.get_data_path() / 'cora/cora.content'), dtype=np.dtype(str))
+
+        with monit.section('Read Citations'):
+            citations = np.genfromtxt(str(lab.get_data_path() / 'cora/cora.cites'), dtype=np.int32)
+        
+        # Get the feature vectors    
+        features = torch.tensor(np.array(content[:, 1:-1], dtype=np.float32))
+        self.features = features / features.sum(dim=1, keepdim=True) # Normalize
+        
+        # Get class names and assign integer tags
+        self.classes = {s: i for i,s in enumerate(set[content[: -1]])}
+        # to labels
+        self.labels = torch.tensor([self.classes[i] for i in content[: -1]], dtype=torch.long)
+        
+        # Get paper ids
+        paper_ids = np.array(content[:, 0], dtype=np.int32)
+        # Map id to idx
+        ids_to_idx = {id_: i for i, id_ in enumerate(paper_ids)}
+        
+        # Empty adj_mat
+        self.adj_mat = torch.eye(len(self.labels), dtype=torch.bool)
+        
+        # Mark the citations in adj_mat
+        if self.include_edges:
+            for e in citations:
+                e1, e2 = ids_to_idx[e[0]], ids_to_idx[e[1]]
+                
+                self.adj_mat[e1][e2] = True
+                self.adj_mat[e2][e1] = True
