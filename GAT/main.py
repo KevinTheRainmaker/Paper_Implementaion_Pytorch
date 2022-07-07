@@ -59,7 +59,7 @@ class CoraDataset:
             features.sum(dim=1, keepdim=True)  # Normalize
 
         # Get class names and assign integer tags
-        self.classes = {s: i for i, s in enumerate(set(content[: -1]))}
+        self.classes = {s: i for i, s in enumerate(set(content[:, -1]))}
         # to labels
         self.labels = torch.tensor([self.classes[i]
                                    for i in content[: -1]], dtype=torch.long)
