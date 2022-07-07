@@ -2,3 +2,6 @@
 */.ipynb_checkpoints
 */data
 */logs
+.DS_Store/
+*/.DS_Store
+./.DS_Store
