@@ -2,6 +2,7 @@ from pyexpat import model
 from typing import Dict
 
 import numpy as np
+from sklearn import datasets
 import torch
 from torch import nn
 
@@ -178,3 +179,31 @@ class Configs(BaseConfigs):
 
             # Save logs
             tracker.save()
+
+
+# Create Cora dataset
+@option(Configs.dataset)
+def load_cora(c: Configs):
+    return CoraDataset(c.include_edges)
+
+
+# Get the number of classes
+calculate(Configs.n_classes, lambda c: len(c.dataset.classes))
+
+# Get the number of features in the input
+calculate(Configs.in_features, lambda c: c.dataset.features.shape[1])
+
+# Create GAT Model
+
+
+def build_gat(c: Configs):
+    return GAT(c.in_features, c.n_hidden, c.n_classes, c.n_heads, c.droput).to(c.device)
+
+# Create configurable optimizer
+
+
+@option(Configs.optimizer)
+def _optimizer(c: Configs):
+    opt_conf = OptimizerConfigs()
+    opt_conf.parameters = c.model.parameters()
+    return opt_conf
