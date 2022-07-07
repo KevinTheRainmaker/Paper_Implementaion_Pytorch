@@ -1,3 +1,4 @@
+from pyexpat import model
 from typing import Dict
 
 import numpy as np
@@ -104,5 +105,76 @@ class GAT(Module):
         x = self.output(x, adj_mat)
         return x
 
-    def accuracy(output: torch.Tensor, labels: torch.Tensor):
-        return output.argmax(dim=-1).eq(labels).sum().item() / len(labels)
+# Simple function to calculate accuracy
+
+
+def accuracy(output: torch.Tensor, labels: torch.Tensor):
+    return output.argmax(dim=-1).eq(labels).sum().item() / len(labels)
+
+
+class Configs(BaseConfigs):
+    model: GAT
+    training_samples: int = 500  # Number of nodes to train on
+    in_features: int  # Number of features per node in the input
+    n_hidden: int = 64  # Number of features in the first layer
+    n_heads: int = 8  # Number of heads
+    n_classes: int = 7  # Number of classes
+    droput: float = 0.6
+    include_edges: bool = True  # include citation network or not
+    dataset: CoraDataset
+    epochs: int = 1000
+    loss_func: nn.CrossEntropyLoss()
+    # set device to train on by passing a config value
+    device: torch.device = DeviceConfigs()
+    optimizer: torch.optim.Adam
+
+    def run(self):
+        '''
+        데이터셋이 크지 않으므로 full batch training 이용
+        '''
+        # Move data to device
+        features = self.dataset.features.to(self.device)
+        labels = self.dataset.labels.to(self.device)
+        edges_adj = self.dataset.adj_mat.to(self.device)
+        edges_adj = edges_adj.unsqueeze(-1)
+
+        idx_rand = torch.randperm(len(labels))
+        # Nodes for training: 2,208개
+        idx_train = idx_rand[:self.training_samples]
+        # Nodes for validation: 500개
+        idx_valid = idx_rand[self.training_samples:]
+
+        # training loop: Monitoring with labml.monit
+        for epoch in monit.loop(self.epochs):
+            self.model.train()  # Set the model to training mode
+            self.optimizer.zero_grad()  # Make all gradients to zero
+
+            output = self.model(features, edges_adj)
+
+            # Get the loss of training nodes
+            loss = self.loss_func(output[idx_train], labels[idx_train])
+
+            # Calculate gradients with backpropagation
+            loss.backward()
+
+            self.optimizer.step()
+
+            # Logging: using labml.tracker
+            tracker.add('loss.train', loss)
+            tracker.add('accuracy.train', accuracy(
+                output[idx_train], labels[idx_train]))
+
+            self.model.eval()  # Set the model to evaluation mode
+            # We do not need to claculate gradients
+            with torch.no_grad():
+                # Evaluate the model again
+                output = self.model(features, edges_adj)
+                loss = self.loss_func(output[idx_valid], labels[idx_valid])
+
+                # Logging
+                tracker.add('loss.valid', loss)
+                tracker.add('accuracy.valid', accuracy(
+                    output[idx_valid], labels[idx_valid]))
+
+            # Save logs
+            tracker.save()
