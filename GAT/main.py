@@ -1,8 +1,6 @@
-from pyexpat import model
 from typing import Dict
 
 import numpy as np
-from sklearn import datasets
 import torch
 from torch import nn
 
@@ -13,35 +11,35 @@ from labml.configs import BaseConfigs, option, calculate
 from labml.utils import download
 from labml_helpers.device import DeviceConfigs
 from labml_helpers.module import Module
+
 from labml_nn.optimizers.configs import OptimizerConfigs
-
-'''
-# Cora Dataset
-
-2,708건의 Scientific Publication을 포함하는 데이터셋.
-7개의 class로 분류되며, 각각의 publication을 노드로 하여 인용 네트워크를 이룬다.
-해당 인용 네트워크는 5,429개의 link(edge)를 가지는 Directed Graph이다.
-
-label prediction과 link prediction 등에서 Benchmarks Dataset로 사용된다.
-'''
 
 
 class CoraDataset:
+    '''
+    # Cora Dataset
+
+    2,708건의 Scientific Publication을 포함하는 데이터셋.
+    7개의 class로 분류되며, 각각의 publication을 노드로 하여 인용 네트워크를 이룬다.
+    해당 인용 네트워크는 5,429개의 link(edge)를 가지는 Directed Graph이다.
+
+    label prediction과 link prediction 등에서 Benchmarks Dataset로 사용된다.
+    '''
     labels: torch.Tensor
     classes: Dict[str, int]
     features: torch.Tensor
     adj_mat: torch.Tensor
 
     # Download the Dataset
-    @classmethod
-    def _download(cls):
+    @staticmethod
+    def _download():
         if not (lab.get_data_path() / 'cora').exists():
             download.download_file('https://linqs-data.soe.ucsc.edu/public/lbc/cora.tgz',
                                    lab.get_data_path() / 'cora.tgz')
             download.extract_tar(lab.get_data_path() /
                                  'cora.tgz', lab.get_data_path())
 
-    def __init__(self, include_edges, bool=True):
+    def __init__(self, include_edges: bool = True):
         self.include_edges = include_edges
         self._download()
 
@@ -55,14 +53,15 @@ class CoraDataset:
 
         # Get the feature vectors
         features = torch.tensor(np.array(content[:, 1:-1], dtype=np.float32))
-        self.features = features / \
-            features.sum(dim=1, keepdim=True)  # Normalize
+
+        # Normalize
+        self.features = features / features.sum(dim=1, keepdim=True)
 
         # Get class names and assign integer tags
         self.classes = {s: i for i, s in enumerate(set(content[:, -1]))}
         # to labels
         self.labels = torch.tensor([self.classes[i]
-                                   for i in content[: -1]], dtype=torch.long)
+                                   for i in content[:, -1]], dtype=torch.long)
 
         # Get paper ids
         paper_ids = np.array(content[:, 0], dtype=np.int32)
@@ -90,21 +89,27 @@ class GAT(Module):
         # First layer: concatenate the heads
         self.layer1 = GraphAttentionLayer(
             in_features, n_hidden, n_heads, is_concat=True, dropout=dropout)
+        # Activation function after first graph attention layer
         self.activation = nn.ELU()
 
         # Second layer: average the heads
         self.output = GraphAttentionLayer(
             n_hidden, n_classes, 1, is_concat=False, dropout=dropout)
+        # Dropout
         self.dropout = nn.Dropout(dropout)
 
     # Stacking layers: x is features vectors of shape [n_nodes, in_features]
+
     def forward(self, x: torch.Tensor, adj_mat: torch.Tensor):
         x = self.dropout(x)
+        # First layer
         x = self.layer1(x, adj_mat)
+        # Activation function
         x = self.activation(x)
+        # Dropout
         x = self.dropout(x)
-        x = self.output(x, adj_mat)
-        return x
+        # Output layer (without activation) for logits
+        return self.output(x, adj_mat)
 
 # Simple function to calculate accuracy
 
@@ -115,17 +120,31 @@ def accuracy(output: torch.Tensor, labels: torch.Tensor):
 
 class Configs(BaseConfigs):
     model: GAT
-    training_samples: int = 500  # Number of nodes to train on
-    in_features: int  # Number of features per node in the input
-    n_hidden: int = 64  # Number of features in the first layer
-    n_heads: int = 8  # Number of heads
-    n_classes: int = 7  # Number of classes
-    droput: float = 0.6
-    include_edges: bool = True  # include citation network or not
+
+    # Number of nodes to train on
+    training_samples: int = 500
+
+    # Number of features per node in the input
+    in_features: int
+
+    # Number of features in the first graph attention layer
+    n_hidden: int = 64
+
+    # Number of heads
+    n_heads: int = 8
+
+    # Number of classes for classification
+    n_classes: int
+
+    # Dropout probability
+    dropout: float = 0.6
+
+    # Whether to include the citation network
+    include_edges: bool = True
+
     dataset: CoraDataset
-    epochs: int = 1000
-    loss_func: nn.CrossEntropyLoss()
-    # set device to train on by passing a config value
+    epochs: int = 1_000
+    loss_func = nn.CrossEntropyLoss()
     device: torch.device = DeviceConfigs()
     optimizer: torch.optim.Adam
 
@@ -183,7 +202,7 @@ class Configs(BaseConfigs):
 
 # Create Cora dataset
 @option(Configs.dataset)
-def load_cora(c: Configs):
+def cora_dataset(c: Configs):
     return CoraDataset(c.include_edges)
 
 
@@ -196,8 +215,9 @@ calculate(Configs.in_features, lambda c: c.dataset.features.shape[1])
 # Create GAT Model
 
 
-def build_gat(c: Configs):
-    return GAT(c.in_features, c.n_hidden, c.n_classes, c.n_heads, c.droput).to(c.device)
+@option(Configs.model)
+def gat_model(c: Configs):
+    return GAT(c.in_features, c.n_hidden, c.n_classes, c.n_heads, c.dropout).to(c.device)
 
 # Create configurable optimizer
 
@@ -218,8 +238,8 @@ def main():
     # Calculate configurations
     experiment.configs(conf, {
         'optimizer.optimizer': 'Adam',
-        'optimizer.learning_rate': 5e-4,  # 오이마사지~
-        'optimizer.weight_decay': 5e-5,
+        'optimizer.learning_rate': 5e-3,
+        'optimizer.weight_decay': 5e-4,
     })
 
     # Start experiment
