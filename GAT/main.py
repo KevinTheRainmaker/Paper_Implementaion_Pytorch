@@ -207,3 +207,21 @@ def _optimizer(c: Configs):
     opt_conf = OptimizerConfigs()
     opt_conf.parameters = c.model.parameters()
     return opt_conf
+
+
+def main():
+    conf = Configs()
+
+    # create experiment log tracker: using labml.experiment
+    experiment.create(name='gat')
+
+    # Calculate configurations
+    experiment.configs(conf, {
+        'optimizer.optimizer': 'Adam',
+        'optimizer.learning_rate': 5e-4,  # 오이마사지~
+        'optimizer.weight_decay': 5e-5,
+    })
+
+    # Start experiment
+    with experiment.start():
+        conf.run()
