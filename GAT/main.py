@@ -3,6 +3,7 @@ from typing import Dict
 import numpy as np
 import torch
 from torch import nn
+from torch import package
 
 from graph_attention import GraphAttentionLayer
 
@@ -198,6 +199,14 @@ class Configs(BaseConfigs):
 
             # Save logs
             tracker.save()
+            path = './gat.pt'
+            package_name = 'gat'
+            resource_name = 'model.pkl'
+
+            with package.PackageExporter(path) as exp:
+                exp.extern('graph_attention')
+                exp.extern('__main__')
+                exp.save_pickle(package_name, resource_name, self.model)
 
 
 # Create Cora dataset
