@@ -199,7 +199,7 @@ class Configs(BaseConfigs):
 
             # Save logs
             tracker.save()
-            path = './gat.pt'
+            path = './GAT/gat.pt'
             package_name = 'gat'
             resource_name = 'model.pkl'
 
