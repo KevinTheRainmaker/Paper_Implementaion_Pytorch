@@ -39,7 +39,7 @@ class GraphAttentionLayer(Module):
         # wheter the nulti-head results should be concatenated or averaged
         if is_concat:
             # Calculate the number of dimensional per head
-            assert out_features % n_heads == 0, "out_features could'nt be divided into n_heads"
+            assert out_features % n_heads == 0, "out_features should be divided into n_heads"
             self.n_hidden = out_features // n_heads
         else:
             self.n_hidden = out_features
