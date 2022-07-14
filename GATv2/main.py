@@ -47,7 +47,7 @@ class GATv2(Module):
         # output layer
         x = self.layer2(x, adj_mat)
 
-        return self.layer2(x, adj_mat)
+        return x
 
 
 def accuracy(output: torch.Tensor, labels: torch.Tensor):
