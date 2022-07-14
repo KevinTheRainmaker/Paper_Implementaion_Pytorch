@@ -1,12 +1,15 @@
+from click import option
+from zmq import device
 from graph_attention_v2 import GraphAttentionV2Layer
 import torch
 from torch import nn
 from torch import package
 
 from labml import tracker, monit
-from labml.configs import BaseConfigs
+from labml.configs import BaseConfigs, option
 from labml_helpers.module import Module
 from labml_helpers.device import DeviceConfigs
+from labml_nn.optimizers.configs import OptimizerConfigs
 
 from build_cora import CoraDataset
 
@@ -23,7 +26,7 @@ class GATv2(Module):
         self.activation = nn.ELU()
 
         # Second layer: average the heads
-        self.layer2 = GraphAttentionV2Layer(n_hidden, n_heads, 1,
+        self.layer2 = GraphAttentionV2Layer(n_hidden, n_classes, 1,
                                             is_concat=False, dropout=dropout, share_weights=share_weights)
 
         self.dropout = nn.Dropout(dropout)
@@ -140,3 +143,21 @@ class Configs(BaseConfigs):
                 exp.extern('graph_attention_v2')
                 exp.extern('__main__')
                 exp.save_pickle(package_name, resource_name, self.model)
+
+
+@option(Configs.model)
+def gat_v2_model(c: Configs):
+    return GATv2(c.in_features, c.n_hidden, c.n_classes,
+                 c.n_heads, c.dropout).to(c, device)
+
+
+@option(Configs.optimizer)
+def _optimizer(c: Configs):
+    opt_conf = OptimizerConfigs()
+    opt_conf.parameters = c.model.parameters()
+    return opt_conf
+
+
+@option(Configs.dataset)
+def cora_dataset(c: Configs):
+    return CoraDataset(c.include_edges)
