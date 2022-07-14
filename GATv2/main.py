@@ -6,7 +6,7 @@ from torch import nn
 from torch import package
 
 from labml import tracker, monit, experiment
-from labml.configs import BaseConfigs, option
+from labml.configs import BaseConfigs, option, calculate
 from labml_helpers.module import Module
 from labml_helpers.device import DeviceConfigs
 from labml_nn.optimizers.configs import OptimizerConfigs
@@ -143,6 +143,11 @@ class Configs(BaseConfigs):
                 exp.extern('graph_attention_v2')
                 exp.extern('__main__')
                 exp.save_pickle(package_name, resource_name, self.model)
+
+
+# calculate n_classes & in_feaqtures
+calculate(Configs.n_classes, lambda c: len(c.dataset.classes))
+calculate(Configs.in_features, lambda c: c.dataset.features.shape[1])
 
 
 @option(Configs.model)
