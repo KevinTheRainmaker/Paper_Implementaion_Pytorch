@@ -47,6 +47,8 @@ class GATv2(Module):
         # output layer
         x = self.layer2(x, adj_mat)
 
+        return self.layer2(x, adj_mat)
+
 
 def accuracy(output: torch.Tensor, labels: torch.Tensor):
     return output.argmax(dim=-1).eq(labels).sum().item() / len(labels)
@@ -107,7 +109,7 @@ class Configs(BaseConfigs):
             self.optimizer.zero_grad()  # Make all gradients to zero
 
             output = self.model(features, edges_adj)
-
+            print(type(output))
             # Get the loss of training nodes
             loss = self.loss_func(output[idx_train], labels[idx_train])
 
