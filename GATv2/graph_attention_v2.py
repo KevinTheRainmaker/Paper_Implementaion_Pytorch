@@ -99,7 +99,7 @@ class GraphAttentionV2Layer(Module):
 
         # g_concat[i,j] = vec(gli) + vec(grj)
         g_concat = g_concat.view(
-            n_nodes, n_nodes, self.n_heads, 2 * self.n_hidden)
+            n_nodes, n_nodes, self.n_heads, self.n_hidden)
 
         # e_ij = a^TLeakyReLU([g_i||g_j]): Here is the main difference
         # e.shape = [n_nodes, n_nodes, n_heads, 1]
