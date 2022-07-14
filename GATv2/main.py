@@ -153,7 +153,7 @@ calculate(Configs.in_features, lambda c: c.dataset.features.shape[1])
 @option(Configs.model)
 def gat_v2_model(c: Configs):
     return GATv2(c.in_features, c.n_hidden, c.n_classes,
-                 c.n_heads, c.dropout).to(c, device)
+                 c.n_heads, c.dropout).to(c.device)
 
 
 @option(Configs.optimizer)
