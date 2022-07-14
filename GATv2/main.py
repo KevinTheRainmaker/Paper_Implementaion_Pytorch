@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from torch import package
 
-from labml import tracker, monit
+from labml import tracker, monit, experiment
 from labml.configs import BaseConfigs, option
 from labml_helpers.module import Module
 from labml_helpers.device import DeviceConfigs
@@ -161,3 +161,23 @@ def _optimizer(c: Configs):
 @option(Configs.dataset)
 def cora_dataset(c: Configs):
     return CoraDataset(c.include_edges)
+
+
+def main():
+    conf = Configs()
+
+    experiment.create(name='GATv2')
+
+    experiment.configs(conf, {
+        'optimizer.optimizer': 'Adam',
+        'optimizer.learning_rate': 5e-4,
+        'optimizer.weight_decay': 1e-4,
+    })
+
+    # Start experiment
+    with experiment.start():
+        conf.run()
+
+
+if __name__ == '__main__':
+    main()
